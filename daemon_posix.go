@@ -231,11 +231,22 @@ func (d *Context) child() (err error) {
 		return
 	}
 	if err = syscall.Dup2(3, 0); err != nil {
-		return
+		// return
+		err = nil
 	}
 
 	if len(d.PidFileName) > 0 {
-		d.pidFile = NewLockFile(os.NewFile(4, d.PidFileName))
+		filePtr := os.NewFile(4, d.PidFileName)
+		if _, err = filePtr.Seek(0, os.SEEK_SET); err != nil {
+			fd, err := syscall.Open(d.PidFileName, syscall.O_RDWR, 0600)
+			if err != nil {
+				return err
+			}
+			if err = syscall.Dup2(fd, 4); err != nil {
+				return err
+			}
+		}
+		d.pidFile = NewLockFile(filePtr)
 		if err = d.pidFile.WritePid(); err != nil {
 			return
 		}
